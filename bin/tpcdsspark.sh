@@ -32,6 +32,7 @@ cleanup() {
     rm -rf $1/*.rrn
     rm -rf $1/*.tpl
     rm -rf $1/*.lst
+    rm -rf $1/*.err
     rm -rf $1/README
   fi
 }

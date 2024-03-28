@@ -381,48 +381,39 @@ function create_spark_tables {
 }
 
 set_env() {
-  # read -n1 -s
   TEST_ROOT=`pwd`
-  set_environment
-  # . $TPCDS_ROOT_DIR/bin/tpcdsenv.sh
   echo "SPARK_HOME is " $SPARK_HOME
-  # set_environment
+  set_environment
+  logInfo "Run Environment is set"
+  logInfo "  TPCDS_GENDATA_DIR    =  $TPCDS_GENDATA_DIR"
+  logInfo "  TPCDS_GENQUERIES_DIR = $TPCDS_GENQUERIES_DIR"
+  logInfo "  TPCSS_LOG_DIR        = $TPCDS_LOG_DIR"
+  logInfo "  TPCDS_WORK_DIR       = $TPCDS_WORK_DIR"
+  logInfo "  TPCDS_ROOT_DIR       = $TPCDS_ROOT_DIR"
+  logInfo "  TPCDS_DBNAME         = $TPCDS_DBNAME"
+}
+
+print_usage()
+{
+    echo "Usage"
+    echo "$0 create|run|clean"
+    echo "  create: Create Spark Tables"
+    echo "  run:    Run all 99 queries"
+    echo "  clean:  Remove all generated files and results"
+    exit 1
 }
 
 main() {
-  set_env
-  while :
-  do
-      clear
-      cat<<EOF
-==============================================
-TPC-DS On Spark Menu
-----------------------------------------------
-SETUP
-(1) Create spark tables
-RUN
-(2) Run a subset of TPC-DS queries
-(3) Run All (99) TPC-DS Queries
-CLEANUP
-(4) Cleanup
-(Q) Quit
-----------------------------------------------
-EOF
-      printf "%s" "Please enter your choice followed by [ENTER]: "
-      read option
-      printf "%s\n\n" "----------------------------------------------"
-      case "$option" in
-      "1")  create_spark_tables ;;
-      "2")  run_subset_tpcds_queries ;;
-      "3")  run_tpcds_queries ;;
-      "4")  cleanup_all ;;
-      "Q")  exit                      ;;
-      "q")  exit                      ;;
-       * )  echo "invalid option"     ;;
-      esac
-      echo "Press any key to continue"
-      read -n1 -s
-  done
+    set_env
+    case "$1" in
+        "create")  create_spark_tables ;;
+        "run")     run_tpcds_queries ;;
+        "clean")   cleanup_all ;;
+         * )  echo "invalid option"     ;;
+    esac
 }
 
-[[ "${BASH_SOURCE[0]}" == "${0}" ]] && main
+if [ $# -ne 1 ] ; then 
+    print_usage
+fi
+[[ "${BASH_SOURCE[0]}" == "${0}" ]] && main $1

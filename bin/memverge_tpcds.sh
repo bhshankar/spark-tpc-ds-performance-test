@@ -405,15 +405,17 @@ print_usage()
 
 main() {
     set_env
-    case "$1" in
-        "create")  create_spark_tables ;;
-        "run")     run_tpcds_queries ;;
-        "clean")   cleanup_all ;;
-         * )  echo "invalid option"     ;;
-    esac
+    create_spark_tables
+    run_tpcds_queries
+#    case "$1" in
+#        "create")  create_spark_tables ;;
+#        "run")     run_tpcds_queries ;;
+#        "clean")   cleanup_all ;;
+#         * )  echo "invalid option"     ;;
+#    esac
 }
 
-if [ $# -ne 1 ] ; then 
-    print_usage
-fi
-[[ "${BASH_SOURCE[0]}" == "${0}" ]] && main $1
+#if [ $# -ne 1 ] ; then 
+#    print_usage
+#fi
+[[ "${BASH_SOURCE[0]}" == "${0}" ]] && main 

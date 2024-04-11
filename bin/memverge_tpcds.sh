@@ -53,6 +53,13 @@ function validate_querynum()
    return 0
 }
 
+function cleanup_spark()
+{
+    logInfo "Clean up spark structures"
+    rm -rf ${SPARK_HOME}/metastore_db ${SPARK_HOME}/spark-warehouse/tpcds.db
+    logInfo "Clean up spark successful..."
+}
+
 function cleanup_all()
 {
     cleanup ${TPCDS_WORK_DIR}
@@ -134,7 +141,7 @@ function check_environment()
       logError "One of the follow set of variables has not been set.  Set them and rerun the script" 
       logError "  TPCDS_GENDATA_DIR    = $TPCDS_GENDATA_DIR"
       logError "  TPCDS_GENQUERIES_DIR = $TPCDS_GENQUERIES_DIR"
-      logError "  TPCSS_LOG_DIR        = $TPCDS_LOG_DIR"
+      logError "  TPCDS_LOG_DIR        = $TPCDS_LOG_DIR"
       logError "  TPCDS_WORK_DIR       = ${TPCDS_WORK_DIR}"
       exit 1
    fi
@@ -183,9 +190,12 @@ function run_tpcds_throughput_common()
     local output_dir=${1}
     cp ${2}/*.sql ${output_dir}
 
-    ${TPCDS_ROOT_DIR}/bin/runqueries.sh ${SPARK_HOME} ${output_dir}  > ${output_dir}/runqueries.out 2>&1 
+    ${TPCDS_ROOT_DIR}/bin/run_throughput_queries.sh ${SPARK_HOME} ${output_dir}  \
+         > ${output_dir}/runqueries.out 2>&1 
     local error_code=0
-    NUM_QUERIES=100
+    # The throughput query is one large conglomeration
+    # Add 1 to 1 queries to signal the end of the run to progress bar
+    NUM_QUERIES=2
     while true ; do
         local progress=`find ${TPCDS_WORK_DIR} -name "*.res" | wc -l`
         # ProgressBar ${progress} ${NUM_QUERIES}
@@ -280,11 +290,6 @@ function setup_throughput_env()
         local output_dir=${TPCDS_WORK_DIR}/stream${i}
         mkdir -p ${output_dir}
         cleanup ${output_dir}
-        touch ${output_dir}/runlist.txt
-        for i in `seq 1 99`
-        do
-            echo "$i" >> ${output_dir}/runlist.txt
-        done
         for i in `ls ${TPCDS_ROOT_DIR}/src/properties/*`
         do
             baseName="$(basename $i)"
@@ -300,18 +305,21 @@ function setup_throughput_env()
 
 function run_tpcds_throughput_queries()
 {
-    TPCDS_NUM_STREAMS=5
-    THROUGHPUT_RUN_DONE=0
+    TPCDS_NUM_STREAMS=21
+    local TPCDS_MAX_AVAILABLE_STREAMS=21
     setup_throughput_env
 
     # track_progress ${TPCDS_WORK_DIR}/stream
     logInfo "Running TPCDS throughput queries. Will take a few hours.. "
     for i in `seq 0 ${TPCDS_NUM_STREAMS}`;
     do
-        run_tpcds_throughput_common ${TPCDS_WORK_DIR}/stream${i} ${TPCDS_STREAM_BASE}${i} &
+        # Take the modulo of the throughput stream.  We have only a fixed number
+        # of steam queries generated, thus we need to round robin through them
+        local base_stream_index=$(( i % TPCDS_MAX_AVAILABLE_STREAMS ))
+        run_tpcds_throughput_common ${TPCDS_WORK_DIR}/stream${i} \
+                                    ${TPCDS_STREAM_BASE}${base_stream_index} &
     done
     wait
-    THROUGHPUT_RUN_DONE=1
 }
 
 function create_spark_tables()
@@ -391,7 +399,7 @@ function set_env()
     logInfo "Run Environment is set"
     logDebug "  TPCDS_GENDATA_DIR    = ${TPCDS_GENDATA_DIR}"
     logDebug "  TPCDS_GENQUERIES_DIR = ${TPCDS_GENQUERIES_DIR}"
-    logDebug "  TPCSS_LOG_DIR        = ${TPCDS_LOG_DIR}"
+    logDebug "  TPCDS_LOG_DIR        = ${TPCDS_LOG_DIR}"
     logDebug "  TPCDS_WORK_DIR       = ${TPCDS_WORK_DIR}"
     logDebug "  TPCDS_STREAM_BASE    = ${TPCDS_STREAM_BASE}"
     logDebug "  TPCDS_ROOT_DIR       = ${TPCDS_ROOT_DIR}"
@@ -409,9 +417,9 @@ function main()
         logInfo "Executing Power Phase"
         time run_tpcds_queries
         logInfo "Executing Througput Phase"
-        NUM_QUERIES=100
         time run_tpcds_throughput_queries
     fi
+    cleanup_spark
 }
 
 

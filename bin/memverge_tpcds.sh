@@ -218,7 +218,7 @@ function run_tpcds_throughput_common()
     else
         echo ""
         logInfo "TPCDS queries ran successfully. Below are the result details"
-        logInfo "Individual result files: ${output_dir}/query<number>.res"
+        logInfo "Overall result file: ${output_dir}/query_0.res"
         logInfo "Summary file: ${output_dir}/run_summary.txt"
     fi
 }

@@ -218,7 +218,7 @@ function run_tpcds_throughput_common()
     else
         echo ""
         logInfo "TPCDS queries ran successfully. Below are the result details"
-        logInfo "Individual result files: ${output_dir}/query<number>.res"
+        logInfo "Overall result file: ${output_dir}/query_0.res"
         logInfo "Summary file: ${output_dir}/run_summary.txt"
     fi
 }
@@ -285,15 +285,17 @@ function run_tpcds_queries()
 
 function setup_throughput_env()
 {
+    local orig_TPCDS_LOG_DIR=${TPCDS_LOG_DIR}
     for i in `seq 0 ${TPCDS_NUM_STREAMS}` ;
     do
         local output_dir=${TPCDS_WORK_DIR}/stream${i}
         mkdir -p ${output_dir}
         cleanup ${output_dir}
-        for i in `ls ${TPCDS_ROOT_DIR}/src/properties/*`
+        TPCDS_LOG_DIR=${output_dir}
+        for f in `ls ${TPCDS_ROOT_DIR}/src/properties/*`
         do
-            baseName="$(basename $i)"
-            template $i > ${output_dir}/$baseName
+            baseName="$(basename $f)"
+            template $f > ${output_dir}/$baseName
         done 
         for i in `ls ${TPCDS_ROOT_DIR}/src/ddl/*.sql`
         do
@@ -301,6 +303,7 @@ function setup_throughput_env()
             template $i > ${output_dir}/$baseName
         done 
     done
+    TPCDS_LOG_DIR=${orig_TPCDS_LOG_DIR}
 }
 
 function run_tpcds_throughput_queries()

@@ -1,4 +1,4 @@
-#!/bin/bash 
+#!/bin/bash
 
 function killtree()
 {
@@ -67,13 +67,13 @@ function cleanup_all()
     logInfo "Cleanup successful.."
 }
 
-function check_createtables() 
+function check_createtables()
 {
     result=$?
     if [ "$result" -ne 0 ]; then
-        return 1 
+        return 1
     fi
-  
+
     cd $SPARK_HOME
     DRIVER_OPTIONS="--driver-memory 4g --driver-java-options -Dlog4j.configuration=file:///${output_dir}/log4j.properties"
     EXECUTOR_OPTIONS="--executor-memory 2g --conf spark.executor.extraJavaOptions=-Dlog4j.configuration=file:///${output_dir}/log4j.properties"
@@ -81,15 +81,16 @@ function check_createtables()
     bin/spark-sql ${DRIVER_OPTIONS} ${EXECUTOR_OPTIONS} --conf spark.sql.catalogImplementation=hive -f ${TPCDS_WORK_DIR}/row_counts.sql > ${TPCDS_WORK_DIR}/rowcounts.out 2> ${TPCDS_WORK_DIR}/rowcounts.err
     cat ${TPCDS_WORK_DIR}/rowcounts.out | grep -v "Time" | grep -v "SLF4J" >> ${TPCDS_WORK_DIR}/rowcounts.rrn
     file1=${TPCDS_WORK_DIR}/rowcounts.rrn
-    if [ -f ${TPCDS_GENDATA_DIR}/../rowcounts.expected ] ; then
-        file2=${TPCDS_GENDATA_DIR}/../rowcounts.expected
-    else
-        file2=${TPCDS_ROOT_DIR}/src/ddl/rowcounts.expected
-    fi
+
+    file2=${TPCDS_WORK_DIR}/rowcounts.expected
+    # TODO: Make this work for other data directories besides 5G
+    # TODO: Hadoop isn't always going to be installed here
+    /home/charlesb/hadoop-3.3.1/bin/hdfs dfs -get /user/charlesb/tpcds5G/data/../rowcounts.expected ${file2}
+
     if cmp -s "$file1" "$file2"
     then
       logInfo "Checking pre-reqs for running TPC-DS queries is successful."
-      return 0 
+      return 0
     else
         logError "The rowcounts for TPC-DS tables are not correct. Please make sure that tables "
         echo     "are successfully run before continuing with the test execution"
@@ -97,7 +98,7 @@ function check_createtables()
     fi
 }
 
-function logDebug() 
+function logDebug()
 {
     if [ ! -z "${DEBUG_SCRIPT}" ] ;
     then
@@ -105,40 +106,40 @@ function logDebug()
     fi
 }
 
-function logInfo() 
+function logInfo()
 {
     echo "INFO: $1"
 }
 
-function logError() 
+function logError()
 {
     echo "ERROR: $1"
 }
 
-function set_environment() 
+function set_environment()
 {
     bin_dir="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
     script_dir="$(dirname "$bin_dir")"
-  
+
     if [ -z "${TPCDS_ROOT_DIR}" ]; then
         TPCDS_ROOT_DIR=${script_dir}
-    fi  
+    fi
     if [ -z "$TPCDS_DBNAME" ]; then
         TPCDS_DBNAME="TPCDS"
-    fi  
+    fi
 }
 
-function check_environment() 
+function check_environment()
 {
    if [ -z "${SPARK_HOME}" ]; then
       logError "SPARK_HOME is not set. Please make sure the following conditions are met."
       logError "1. Set SPARK_HOME and make sure it points to a valid spark installation."
       logError "2. The userid running the script has permission to execute spark shell."
       exit 1
-   fi  
+   fi
    if [ -z "${TPCDS_LOG_DIR}" ]  || [ -z "${TPCDS_WORK_DIR}" ] \
       || [ -z "${TPCDS_GENDATA_DIR}" ] || [ -z "${TPCDS_GENQUERIES_DIR}" ] ; then
-      logError "One of the follow set of variables has not been set.  Set them and rerun the script" 
+      logError "One of the follow set of variables has not been set.  Set them and rerun the script"
       logError "  TPCDS_GENDATA_DIR    = $TPCDS_GENDATA_DIR"
       logError "  TPCDS_GENQUERIES_DIR = $TPCDS_GENQUERIES_DIR"
       logError "  TPCDS_LOG_DIR        = $TPCDS_LOG_DIR"
@@ -155,7 +156,7 @@ function template()
             line=${line//\`/\\\`}
             line=${line//\$/\\\$}
             line=${line//\\\$\{/\${}
-            eval "echo \"$line\""; 
+            eval "echo \"$line\"";
     done < ${1}
 }
 
@@ -189,9 +190,10 @@ function run_tpcds_throughput_common()
 {
     local output_dir=${1}
     cp ${2}/*.sql ${output_dir}
+    local port=${3}
 
-    ${TPCDS_ROOT_DIR}/bin/run_throughput_queries.sh ${SPARK_HOME} ${output_dir}  \
-         > ${output_dir}/runqueries.out 2>&1 
+    ${TPCDS_ROOT_DIR}/bin/run_throughput_queries.sh ${SPARK_HOME} ${output_dir} ${port}  \
+         > ${output_dir}/runqueries.out 2>&1
     local error_code=0
     # The throughput query is one large conglomeration
     # Add 1 to 1 queries to signal the end of the run to progress bar
@@ -200,21 +202,21 @@ function run_tpcds_throughput_common()
         local progress=`find ${TPCDS_WORK_DIR} -name "*.res" | wc -l`
         # ProgressBar ${progress} ${NUM_QUERIES}
 
-        ps -p ${script_pid} > /dev/null 
+        ps -p ${script_pid} > /dev/null
         if [ $? == 1 ]; then
             local error_code=1
         fi
-        if [ "$error_code" -gt 0 ] || [ "$progress" -ge $NUM_QUERIES ] ; then 
+        if [ "$error_code" -gt 0 ] || [ "$progress" -ge $NUM_QUERIES ] ; then
             echo ${progress}, ${error_code}
             break
         fi
         sleep 0.1
-    done 
+    done
     progress=`find ${output_dir} -name "*.res" | wc -l`
-   
-    if [ "${progress}" -lt $NUM_QUERIES ] ; then 
+
+    if [ "${progress}" -lt $NUM_QUERIES ] ; then
         echo ""
-        logError "Failed to run TPCDS queries. Please look at ${output_dir}/runqueries.out for error details" 
+        logError "Failed to run TPCDS queries. Please look at ${output_dir}/runqueries.out for error details"
     else
         echo ""
         logInfo "TPCDS queries ran successfully. Below are the result details"
@@ -223,7 +225,7 @@ function run_tpcds_throughput_common()
     fi
 }
 
-function run_tpcds_common() 
+function run_tpcds_common()
 {
     output_dir=${TPCDS_WORK_DIR}
     cp ${TPCDS_GENQUERIES_DIR}/*.sql ${TPCDS_WORK_DIR}
@@ -236,26 +238,26 @@ function run_tpcds_common()
         progress=`find ${TPCDS_WORK_DIR} -name "*.res" | wc -l`
         ProgressBar ${progress} ${NUM_QUERIES}
 
-        ps -p $script_pid > /dev/null 
+        ps -p $script_pid > /dev/null
         if [ $? == 1 ]; then
             error_code=1
         fi
-        if [ "$error_code" -gt 0 ] || [ "$progress" -ge $NUM_QUERIES ] ; then 
+        if [ "$error_code" -gt 0 ] || [ "$progress" -ge $NUM_QUERIES ] ; then
             break
         fi
         sleep 0.1
-    done 
+    done
     progress=`find ${TPCDS_WORK_DIR} -name "*.res" | wc -l`
-   
-    if [ "$progress" -lt $NUM_QUERIES ] ; then 
+
+    if [ "$progress" -lt $NUM_QUERIES ] ; then
         echo ""
-        logError "Failed to run TPCDS queries. Please look at ${TPCDS_WORK_DIR}/runqueries.out for error details" 
+        logError "Failed to run TPCDS queries. Please look at ${TPCDS_WORK_DIR}/runqueries.out for error details"
     else
         echo ""
         logInfo "TPCDS queries ran successfully. Below are the result details"
         logInfo "Individual result files: ${TPCDS_WORK_DIR}/query<number>.res"
         logInfo "Summary file: ${TPCDS_WORK_DIR}/run_summary.txt"
-    fi 
+    fi
 }
 
 function run_tpcds_queries()
@@ -271,12 +273,12 @@ function run_tpcds_queries()
     do
         baseName="$(basename $i)"
         template $i > ${output_dir}/$baseName
-    done 
+    done
     for i in `ls ${TPCDS_ROOT_DIR}/src/ddl/*.sql`
     do
         baseName="$(basename $i)"
         template $i > ${output_dir}/$baseName
-    done 
+    done
     # 1 add to 99 queries to signal the end of the run to progress bar
     NUM_QUERIES=100
     logInfo "Running TPCDS queries. Will take a few hours.. "
@@ -296,22 +298,22 @@ function setup_throughput_env()
         do
             baseName="$(basename $f)"
             template $f > ${output_dir}/$baseName
-        done 
+        done
         for i in `ls ${TPCDS_ROOT_DIR}/src/ddl/*.sql`
         do
             baseName="$(basename $i)"
             template $i > ${output_dir}/$baseName
-        done 
+        done
     done
     TPCDS_LOG_DIR=${orig_TPCDS_LOG_DIR}
 }
 
 function run_tpcds_throughput_queries()
 {
-    TPCDS_NUM_STREAMS=21
+    TPCDS_NUM_STREAMS=0
     local TPCDS_MAX_AVAILABLE_STREAMS=21
+    local port=4040
     setup_throughput_env
-
     # track_progress ${TPCDS_WORK_DIR}/stream
     logInfo "Running TPCDS throughput queries. Will take a few hours.. "
     for i in `seq 0 ${TPCDS_NUM_STREAMS}`;
@@ -320,7 +322,9 @@ function run_tpcds_throughput_queries()
         # of steam queries generated, thus we need to round robin through them
         local base_stream_index=$(( i % TPCDS_MAX_AVAILABLE_STREAMS ))
         run_tpcds_throughput_common ${TPCDS_WORK_DIR}/stream${i} \
-                                    ${TPCDS_STREAM_BASE}${base_stream_index} &
+                                    ${TPCDS_STREAM_BASE}${base_stream_index} \
+                                    ${port} &
+        (( port++ ))
     done
     wait
 }
@@ -343,14 +347,14 @@ function create_spark_tables()
     do
         baseName="$(basename $i)"
         template $i > ${output_dir}/$baseName
-    done 
+    done
     for i in `ls ${TPCDS_ROOT_DIR}/src/properties/*`
     do
         baseName="$(basename $i)"
         template $i > ${output_dir}/$baseName
-    done 
+    done
     result=$?
-    if [ "$result" -ne 1 ]; then 
+    if [ "$result" -ne 1 ]; then
         current_dir=`pwd`
         cd $SPARK_HOME
         DRIVER_OPTIONS="--driver-java-options -Dlog4j.configuration=file:///${output_dir}/log4j.properties"
@@ -371,17 +375,17 @@ function create_spark_tables()
                 error_code=`cat ${TPCDS_WORK_DIR}/create_tables.out | grep -i "error" | wc -l`
             fi
 
-            ps -p $script_pid > /dev/null 
+            ps -p $script_pid > /dev/null
             if [ $? == 1 ]; then
                 error_code=1
             fi
- 
-            if [ "$error_code" -gt 0 ] || [ "$progress" -gt 121 ] ; then 
+
+            if [ "$error_code" -gt 0 ] || [ "$progress" -gt 121 ] ; then
                 cont=-1
             fi
             sleep 0.1
-        done  
-        if [ "$error_code" -gt 0 ] ; then 
+        done
+        if [ "$error_code" -gt 0 ] ; then
             logError "Failed to create spark tables. Please review the following logs"
             logError "${TPCDS_WORK_DIR}/create_tables.out"
             logError "${TPCDS_WORK_DIR}/temp/create_database.out"
@@ -415,7 +419,7 @@ function main()
     time create_spark_tables
     check_createtables
     result=$?
-    if [ "$result" -ne 1 ]; then 
+    if [ "$result" -ne 1 ]; then
         # Execute the Run tests if and only if the tables have been successfully created.
         logInfo "Executing Power Phase"
         time run_tpcds_queries
@@ -426,4 +430,4 @@ function main()
 }
 
 
-[[ "${BASH_SOURCE[0]}" == "${0}" ]] && main 
+[[ "${BASH_SOURCE[0]}" == "${0}" ]] && main

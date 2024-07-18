@@ -83,9 +83,8 @@ function check_createtables()
     file1=${TPCDS_WORK_DIR}/rowcounts.rrn
 
     file2=${TPCDS_WORK_DIR}/rowcounts.expected
-    # TODO: Make this work for other data directories besides 5G
-    # TODO: Hadoop isn't always going to be installed here
-    /home/charlesb/hadoop-3.3.1/bin/hdfs dfs -get /user/charlesb/tpcds5G/data/../rowcounts.expected ${file2}
+    # TODO: Do other sizes besides 1G
+    sudo /opt/alluxio/bin/alluxio fs cat /user/charlesb/tpcds1G/rowcounts.expected > ${file2}
 
     if cmp -s "$file1" "$file2"
     then

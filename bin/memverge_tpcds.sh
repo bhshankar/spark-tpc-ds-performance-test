@@ -109,7 +109,6 @@ function check_createtables()
     file1=${TPCDS_WORK_DIR}/rowcounts.rrn
 
     file2=${TPCDS_WORK_DIR}/rowcounts.expected
-    sudo /opt/alluxio/bin/alluxio fs cat ${TPCDS_ALLUXIO_DIR}/rowcounts.expected > ${file2}
 
     if cmp -s "$file1" "$file2"
     then

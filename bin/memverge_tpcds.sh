@@ -1,5 +1,31 @@
 #!/bin/bash
 
+me=$( whoami )
+
+
+function logDebug()
+{
+    if [ ! -z "${DEBUG_SCRIPT}" ] ;
+    then
+        echo "DEBUG: $1"
+    fi
+}
+
+function logInfo()
+{
+    echo "INFO: $1"
+}
+
+function logError()
+{
+    echo "ERROR: $1"
+}
+
+function log()
+{
+    echo "$1"
+}
+
 function killtree()
 {
     local parent=$1 child
@@ -13,13 +39,13 @@ function handle_shutdown()
 {
     killtree $1
     cleanup $2
-    echo ""
-    echo "Script was terminated abnormally. Finished cleaning up.. "
+    log ""
+    log "Script was terminated abnormally. Finished cleaning up.. "
 }
 
 function handle_shutdown1()
 {
-    echo "Script was terminated abnormally. Finished cleaning up.. "
+    log "Script was terminated abnormally. Finished cleaning up.. "
     exit 1
 }
 
@@ -83,8 +109,7 @@ function check_createtables()
     file1=${TPCDS_WORK_DIR}/rowcounts.rrn
 
     file2=${TPCDS_WORK_DIR}/rowcounts.expected
-    # TODO: Do other sizes besides 1G
-    sudo /opt/alluxio/bin/alluxio fs cat /user/charlesb/tpcds1G/rowcounts.expected > ${file2}
+    sudo /opt/alluxio/bin/alluxio fs cat ${TPCDS_ALLUXIO_DIR}/rowcounts.expected > ${file2}
 
     if cmp -s "$file1" "$file2"
     then
@@ -92,27 +117,9 @@ function check_createtables()
       return 0
     else
         logError "The rowcounts for TPC-DS tables are not correct. Please make sure that tables "
-        echo     "are successfully run before continuing with the test execution"
+        log      "are successfully run before continuing with the test execution"
         return 1
     fi
-}
-
-function logDebug()
-{
-    if [ ! -z "${DEBUG_SCRIPT}" ] ;
-    then
-        echo "DEBUG: $1"
-    fi
-}
-
-function logInfo()
-{
-    echo "INFO: $1"
-}
-
-function logError()
-{
-    echo "ERROR: $1"
 }
 
 function set_environment()
@@ -136,13 +143,15 @@ function check_environment()
       logError "2. The userid running the script has permission to execute spark shell."
       exit 1
    fi
-   if [ -z "${TPCDS_LOG_DIR}" ]  || [ -z "${TPCDS_WORK_DIR}" ] \
-      || [ -z "${TPCDS_GENDATA_DIR}" ] || [ -z "${TPCDS_GENQUERIES_DIR}" ] ; then
+   if [ -z "${TPCDS_LOG_DIR}" ]        || [ -z "${TPCDS_WORK_DIR}" ]       \
+      || [ -z "${TPCDS_GENDATA_DIR}" ] || [ -z "${TPCDS_GENQUERIES_DIR}" ] \
+      || [ -z "${TPCDS_ALLUXIO_DIR}" ]; then
       logError "One of the follow set of variables has not been set.  Set them and rerun the script"
       logError "  TPCDS_GENDATA_DIR    = $TPCDS_GENDATA_DIR"
       logError "  TPCDS_GENQUERIES_DIR = $TPCDS_GENQUERIES_DIR"
       logError "  TPCDS_LOG_DIR        = $TPCDS_LOG_DIR"
       logError "  TPCDS_WORK_DIR       = ${TPCDS_WORK_DIR}"
+      logError "  TPCDS_ALLUXIO_DIR    = ${TPCDS_ALLUXIO_DIR}"
       exit 1
    fi
 }
@@ -214,10 +223,10 @@ function run_tpcds_throughput_common()
     progress=`find ${output_dir} -name "*.res" | wc -l`
 
     if [ "${progress}" -lt $NUM_QUERIES ] ; then
-        echo ""
+        log ""
         logError "Failed to run TPCDS queries. Please look at ${output_dir}/runqueries.out for error details"
     else
-        echo ""
+        log ""
         logInfo "TPCDS queries ran successfully. Below are the result details"
         logInfo "Overall result file: ${output_dir}/query_0.res"
         logInfo "Summary file: ${output_dir}/run_summary.txt"
@@ -249,10 +258,10 @@ function run_tpcds_common()
     progress=`find ${TPCDS_WORK_DIR} -name "*.res" | wc -l`
 
     if [ "$progress" -lt $NUM_QUERIES ] ; then
-        echo ""
+        log ""
         logError "Failed to run TPCDS queries. Please look at ${TPCDS_WORK_DIR}/runqueries.out for error details"
     else
-        echo ""
+        log ""
         logInfo "TPCDS queries ran successfully. Below are the result details"
         logInfo "Individual result files: ${TPCDS_WORK_DIR}/query<number>.res"
         logInfo "Summary file: ${TPCDS_WORK_DIR}/run_summary.txt"
@@ -266,7 +275,7 @@ function run_tpcds_queries()
     touch ${output_dir}/runlist.txt
     for i in `seq 1 99`
     do
-        echo "$i" >> ${output_dir}/runlist.txt
+        log "$i" >> ${output_dir}/runlist.txt
     done
     for i in `ls ${TPCDS_ROOT_DIR}/src/properties/*`
     do
@@ -334,11 +343,11 @@ function create_spark_tables()
     output_dir=${TPCDS_WORK_DIR}
     cleanup ${TPCDS_WORK_DIR}
     trap 'handle_shutdown $$ $output_dir; exit' SIGHUP SIGQUIT SIGINT SIGTERM
-    echo "USE ${TPCDS_DBNAME};" >> ${output_dir}/create_tables_temp.sql
+    log "USE ${TPCDS_DBNAME};" >> ${output_dir}/create_tables_temp.sql
     for i in `ls ${TPCDS_ROOT_DIR}/src/ddl/individual/*.sql`
     do
         cat $i >> ${output_dir}/create_tables_temp.sql
-        echo "" >> ${output_dir}/create_tables_temp.sql
+        log "" >> ${output_dir}/create_tables_temp.sql
     done
     template ${output_dir}/create_tables_temp.sql > ${output_dir}/create_tables_work.sql
 
@@ -390,7 +399,7 @@ function create_spark_tables()
             logError "${TPCDS_WORK_DIR}/temp/create_database.out"
             logError "${TPCDS_LOG_DIR}/spark-tpcds.log"
         else
-            echo ""
+            log ""
             logInfo "Spark tables created successfully.."
         fi
         cd $current_dir
@@ -400,7 +409,7 @@ function create_spark_tables()
 function set_env()
 {
     TEST_ROOT=`pwd`
-    echo "SPARK_HOME is " $SPARK_HOME
+    log "SPARK_HOME is " $SPARK_HOME
     set_environment
     logInfo "Run Environment is set"
     logDebug "  TPCDS_GENDATA_DIR    = ${TPCDS_GENDATA_DIR}"

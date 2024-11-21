@@ -7,7 +7,7 @@
 # This is a mandatory parameter. Please provide the location of
 # spark installation.
 #######################################################################
-export SPARK_HOME=~/Projects/Benchmarks/tpcds-native/sparki-3.5.1-bin-hadoop3
+export SPARK_HOME=/memverge/home/bhanus/Projects/Benchmarks/tpcds-native/spark-3.5.3-bin-hadoop3
 
 #######################################################################
 # Script environment parameters. When they are not set the script

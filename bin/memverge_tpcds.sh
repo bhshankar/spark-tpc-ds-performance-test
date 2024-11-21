@@ -105,19 +105,18 @@ function check_createtables()
     EXECUTOR_OPTIONS="--executor-memory 2g --conf spark.executor.extraJavaOptions=-Dlog4j.configuration=file:///${output_dir}/log4j.properties"
     logInfo "Checking pre-reqs for running TPC-DS queries. May take a few seconds.."
     bin/spark-sql ${DRIVER_OPTIONS} ${EXECUTOR_OPTIONS} --conf spark.sql.catalogImplementation=hive -f ${TPCDS_WORK_DIR}/row_counts.sql > ${TPCDS_WORK_DIR}/rowcounts.out 2> ${TPCDS_WORK_DIR}/rowcounts.err
-    cat ${TPCDS_WORK_DIR}/rowcounts.out | grep -v "Time" | grep -v "SLF4J" >> ${TPCDS_WORK_DIR}/rowcounts.rrn
-    file1=${TPCDS_WORK_DIR}/rowcounts.rrn
-
-    file2=${TPCDS_WORK_DIR}/rowcounts.expected
+    local file1=${TPCDS_WORK_DIR}/rowcounts.rrn
+    local file2=${TPCDS_WORK_DIR}/rowcounts.expected
+    cat ${TPCDS_WORK_DIR}/rowcounts.out | grep -v "Time" | grep -v "SLF4J" >> ${file1}
 
     if cmp -s "$file1" "$file2"
     then
       logInfo "Checking pre-reqs for running TPC-DS queries is successful."
       return 0
     else
-        logError "The rowcounts for TPC-DS tables are not correct. Please make sure that tables "
-        log      "are successfully run before continuing with the test execution"
-        return 1
+      logError "The rowcounts for TPC-DS tables are not correct. Please make sure that tables "
+      log      "are successfully run before continuing with the test execution"
+      return 1
     fi
 }
 
